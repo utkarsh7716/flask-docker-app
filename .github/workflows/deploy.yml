@@ -1,0 +1,29 @@
+name: CI/CD to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Add SSH Key
+      run: |
+        echo "${{ secrets.EC2_SSH_KEY }}" > private_key.pem
+        chmod 600 private_key.pem
+
+    - name: Deploy to EC2
+      run: |
+        ssh -o StrictHostKeyChecking=no -i private_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          docker stop flask-docker-app || true
+          docker rm flask-docker-app || true
+          cd ~/flask-docker-app || mkdir ~/flask-docker-app && cd ~/flask-docker-app
+          git pull || git clone https://github.com/utkarsh7716/flask-docker-app.git .
+          docker build -t flask-docker-app .
+          docker run -d -p 5000:5000 flask-docker-app
+        EOF
